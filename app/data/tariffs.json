@@ -1,0 +1,268 @@
+{
+  "rko": {
+    "description": "Тарифы расчётно-кассового обслуживания",
+    "plans": [
+      {
+        "id": "start",
+        "name": "Старт",
+        "monthly_fee": 0,
+        "monthly_fee_condition": "При обороте от 10 000 ₽/мес, иначе 490 ₽/мес",
+        "max_turnover": 500000,
+        "min_turnover": 0,
+        "features": {
+          "online_payment_fee": 19,
+          "online_payment_fee_unit": "руб/платёж",
+          "free_online_payments_per_month": 10,
+          "internal_transfer_fee": 0,
+          "cash_deposit_rate": 0.005,
+          "cash_deposit_min": 100,
+          "cash_withdrawal_rate": 0.015,
+          "cash_withdrawal_min": 200,
+          "free_cash_withdrawal_per_month": 10000,
+          "corporate_cards": 1,
+          "dedicated_manager": false,
+          "salary_project": false,
+          "currency_account": false,
+          "api_access": false
+        },
+        "best_for": ["ИП", "новый бизнес", "стартап", "минимальный оборот"]
+      },
+      {
+        "id": "business",
+        "name": "Бизнес",
+        "monthly_fee": 990,
+        "monthly_fee_condition": null,
+        "max_turnover": 5000000,
+        "min_turnover": 500001,
+        "features": {
+          "online_payment_fee": 0,
+          "online_payment_fee_unit": "руб/платёж (до 50/мес)",
+          "free_online_payments_per_month": 50,
+          "extra_payment_fee": 19,
+          "internal_transfer_fee": 0,
+          "cash_deposit_rate": 0.003,
+          "cash_deposit_min": 50,
+          "cash_withdrawal_rate": 0.01,
+          "cash_withdrawal_min": 150,
+          "free_cash_withdrawal_per_month": 100000,
+          "corporate_cards": 5,
+          "dedicated_manager": true,
+          "manager_hours": "9:00–21:00 в рабочие дни",
+          "salary_project": true,
+          "currency_account": false,
+          "api_access": true,
+          "acquiring_available": true
+        },
+        "best_for": ["ООО", "действующий бизнес", "средний оборот", "розница", "услуги"]
+      },
+      {
+        "id": "corporate",
+        "name": "Корпоративный",
+        "monthly_fee": 2490,
+        "monthly_fee_condition": null,
+        "max_turnover": null,
+        "min_turnover": 5000001,
+        "features": {
+          "online_payment_fee": 0,
+          "online_payment_fee_unit": "руб/платёж (без лимита)",
+          "free_online_payments_per_month": null,
+          "internal_transfer_fee": 0,
+          "cash_deposit_rate": 0.0015,
+          "cash_deposit_min": 30,
+          "cash_withdrawal_rate": 0.005,
+          "cash_withdrawal_min": 100,
+          "free_cash_withdrawal_per_month": 400000,
+          "corporate_cards": null,
+          "dedicated_manager": true,
+          "manager_hours": "24/7 персональный",
+          "salary_project": true,
+          "currency_account": true,
+          "api_access": true,
+          "acquiring_available": true,
+          "priority_support": true
+        },
+        "best_for": ["крупный МСБ", "высокий оборот", "сеть точек", "ВЭД", "холдинг"]
+      }
+    ]
+  },
+  "acquiring": {
+    "description": "Тарифы эквайринга",
+    "types": {
+      "pos": {
+        "name": "Торговый эквайринг",
+        "description": "Приём оплаты через POS-терминал в торговой точке",
+        "rates": [
+          {"min_turnover": 0, "max_turnover": 100000, "rate": 0.023},
+          {"min_turnover": 100001, "max_turnover": 500000, "rate": 0.021},
+          {"min_turnover": 500001, "max_turnover": 1500000, "rate": 0.019},
+          {"min_turnover": 1500001, "max_turnover": 5000000, "rate": 0.017},
+          {"min_turnover": 5000001, "max_turnover": null, "rate": 0.014, "note": "По договорённости, от 1,4%"}
+        ],
+        "terminal_rental_fee": 0,
+        "terminal_rental_condition": "При обороте от 30 000 ₽/мес, иначе 990 ₽/мес",
+        "terminal_purchase_price": 8900,
+        "settlement_days": 1,
+        "settlement_note": "T+1 для счёта в Точке, T+2 для других банков"
+      },
+      "internet": {
+        "name": "Интернет-эквайринг",
+        "description": "Приём оплаты на сайте или в мобильном приложении",
+        "rates": [
+          {"min_turnover": 0, "max_turnover": 300000, "rate": 0.025},
+          {"min_turnover": 300001, "max_turnover": 1000000, "rate": 0.022},
+          {"min_turnover": 1000001, "max_turnover": 3000000, "rate": 0.020},
+          {"min_turnover": 3000001, "max_turnover": null, "rate": 0.017, "note": "По договорённости, от 1,7%"}
+        ],
+        "setup_fee": 0,
+        "monthly_fee": 0,
+        "settlement_days": 1,
+        "features": ["API", "плагины CMS", "рекуррентные платежи", "холдирование", "3DS 2.0"]
+      },
+      "mpos": {
+        "name": "Мобильный эквайринг",
+        "description": "Приём оплаты через смартфон с картридером",
+        "rate": 0.023,
+        "reader_price": 0,
+        "reader_price_note": "Бесплатно при подключении (1 шт.)",
+        "settlement_days": 1
+      },
+      "sbp": {
+        "name": "Оплата по QR (СБП)",
+        "description": "Приём оплаты через QR-код Системы быстрых платежей",
+        "rate": 0.004,
+        "rate_social": 0.002,
+        "rate_social_note": "Для социально значимых категорий",
+        "setup_fee": 0,
+        "monthly_fee": 0,
+        "settlement_note": "Мгновенно"
+      }
+    }
+  },
+  "credit": {
+    "description": "Кредитные продукты для МСБ",
+    "products": [
+      {
+        "id": "working_capital",
+        "name": "Оборотный кредит",
+        "purpose": "Пополнение оборотного капитала, закупка товара, выплата зарплаты",
+        "min_amount": 300000,
+        "max_amount": 10000000,
+        "min_term_months": 3,
+        "max_term_months": 24,
+        "rate_from": 0.18,
+        "collateral_required": false,
+        "collateral_note": "Не требуется для сумм до 3 000 000 ₽",
+        "repayment_type": "аннуитет",
+        "requirements": {
+          "min_business_age_months": 6,
+          "min_account_age_months": 3,
+          "min_monthly_turnover": 300000
+        },
+        "decision_days": 1,
+        "decision_note": "1 рабочий день для сумм до 3 000 000 ₽"
+      },
+      {
+        "id": "business_development",
+        "name": "Кредит на развитие бизнеса",
+        "purpose": "Покупка оборудования, транспорта, ремонт, расширение производства",
+        "min_amount": 1000000,
+        "max_amount": 50000000,
+        "min_term_months": 12,
+        "max_term_months": 84,
+        "rate_from": 0.16,
+        "collateral_required": true,
+        "collateral_note": "Залог приобретаемого имущества или поручительство",
+        "down_payment_rate": 0.20,
+        "repayment_type": "аннуитет (возможна отсрочка до 6 мес)",
+        "requirements": {
+          "min_business_age_months": 12,
+          "min_account_age_months": 6,
+          "min_monthly_turnover": 1000000
+        },
+        "decision_days": 5
+      },
+      {
+        "id": "overdraft",
+        "name": "Овердрафт",
+        "purpose": "Краткосрочное покрытие кассовых разрывов",
+        "max_limit_ratio": 0.50,
+        "max_limit_ratio_note": "До 50% от среднемесячного оборота",
+        "max_amount": 5000000,
+        "max_tranche_days": 60,
+        "rate_from": 0.19,
+        "collateral_required": false,
+        "setup_fee": 0,
+        "unused_limit_fee": 0,
+        "requirements": {
+          "min_account_age_months": 6,
+          "min_monthly_turnover": 500000,
+          "no_account_arrears": true
+        },
+        "decision_days": 2
+      },
+      {
+        "id": "credit_line",
+        "name": "Кредитная линия",
+        "purpose": "Финансирование регулярных закупок, сезонного пополнения склада",
+        "min_amount": 1000000,
+        "max_amount": 30000000,
+        "max_line_term_months": 36,
+        "max_tranche_term_months": 12,
+        "rate_from": 0.17,
+        "revolving": true,
+        "collateral_note": "Залог товаров в обороте, недвижимость или поручительство",
+        "repayment_type": "по каждому траншу отдельно",
+        "requirements": {
+          "min_business_age_months": 12,
+          "min_account_age_months": 6,
+          "min_monthly_turnover": 1000000
+        },
+        "decision_days": 5
+      }
+    ],
+    "early_repayment": {
+      "penalty": false,
+      "min_months_before_penalty_free": 3,
+      "min_partial_repayment": 50000
+    },
+    "subsidy_programs": [
+      {
+        "name": "Программа льготного кредитования МСП",
+        "rate_from": 0.095,
+        "max_amount": 2000000000,
+        "target_industries": ["производство", "сельское хозяйство", "туризм", "IT", "здравоохранение"],
+        "requirement": "Статус субъекта МСП в реестре ФНС"
+      }
+    ]
+  },
+  "bundles": [
+    {
+      "id": "start_basic",
+      "name": "Старт + QR-эквайринг",
+      "products": ["rko:start", "acquiring:sbp"],
+      "monthly_fee": 0,
+      "description": "Идеально для ИП и самозанятых с небольшим потоком платежей"
+    },
+    {
+      "id": "business_pos",
+      "name": "Бизнес + Торговый эквайринг",
+      "products": ["rko:business", "acquiring:pos"],
+      "monthly_fee": 990,
+      "description": "Полный пакет для розничного магазина или кафе"
+    },
+    {
+      "id": "business_online",
+      "name": "Бизнес + Интернет-эквайринг",
+      "products": ["rko:business", "acquiring:internet"],
+      "monthly_fee": 990,
+      "description": "Для интернет-магазинов и онлайн-сервисов"
+    },
+    {
+      "id": "corporate_full",
+      "name": "Корпоративный + Эквайринг",
+      "products": ["rko:corporate", "acquiring:pos", "acquiring:internet", "acquiring:sbp"],
+      "monthly_fee": 2490,
+      "description": "Максимальный пакет для растущего бизнеса с сетью точек"
+    }
+  ]
+}
