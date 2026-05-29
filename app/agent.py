@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 
 PROMPTS_DIR = Path(__file__).parent / "prompts"
 
-DEFAULT_GROQ_MODEL = "llama3-groq-70b-8192-tool-use-preview"
+DEFAULT_GROQ_MODEL = os.getenv("GROQ_MODEL", "meta-llama/llama-4-scout-17b-16e-instruct")
 
 
 def _load_prompt(name: str) -> str:

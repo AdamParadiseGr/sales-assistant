@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from app.key_manager import AllKeysExhaustedError, GroqKeyManager, _is_rate_limit
 
@@ -21,6 +21,11 @@ class EvaluationResult(BaseModel):
     groundedness: int = Field(..., ge=0, le=10, description="Обоснованность данными из базы (0–10)")
     sales_effectiveness: int = Field(..., ge=0, le=10, description="Эффективность продаж (0–10)")
     reasoning: str = Field(..., description="Краткое объяснение всех трёх оценок")
+
+    @field_validator('relevance', 'groundedness', 'sales_effectiveness', mode='before')
+    @classmethod
+    def coerce_to_int(cls, v):
+        return int(v)
 
     @property
     def average(self) -> float:
@@ -43,7 +48,7 @@ class Evaluator:
     ) -> None:
         self._key_manager = key_manager
         self._rebuild_llm_fn = rebuild_llm
-        self._structured_llm = llm.with_structured_output(EvaluationResult)
+        self._structured_llm = llm.with_structured_output(EvaluationResult, method="json_mode")
         self._judge_template = self._load_judge_prompt()
         LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
 
@@ -90,7 +95,7 @@ class Evaluator:
                     try:
                         self._key_manager.rotate()  # type: ignore[union-attr]
                         new_llm = self._rebuild_llm_fn()  # type: ignore[misc]
-                        self._structured_llm = new_llm.with_structured_output(EvaluationResult)
+                        self._structured_llm = new_llm.with_structured_output(EvaluationResult, method="json_mode")
                     except AllKeysExhaustedError as ke:
                         logger.error("Evaluator: all Groq keys exhausted: %s", ke)
                         return EvaluationResult(

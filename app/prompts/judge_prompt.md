@@ -14,7 +14,7 @@
 
 ## Метрики оценки
 
-Оцени каждую метрику от 0 до 10 целым числом.
+Оцени каждую метрику от 0 до 10 целым числом. Return scores as plain integers WITHOUT quotes. Example: 7, not "7"
 
 ### relevance — Релевантность
 Насколько ответ ассистента относится к вопросу пользователя?
@@ -45,3 +45,10 @@
 
 ### reasoning — Пояснение
 Краткое объяснение всех трёх оценок в 2–3 предложениях. Будь конкретен: что именно хорошо или плохо в ответе.
+
+## Формат ответа
+
+Respond ONLY with a valid JSON object (no markdown, no extra text):
+```json
+{{"relevance": 7, "groundedness": 8, "sales_effectiveness": 6, "reasoning": "..."}}
+```

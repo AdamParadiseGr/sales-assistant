@@ -120,10 +120,13 @@ Groq free-tier keys have per-minute token limits. `GroqKeyManager` (`app/key_man
 |---|---|
 | Unit tests | 109 passing, 2 skipped (integration, require live API key) |
 | Test coverage | RAG tool, tariff calculator, lead tool, evaluator, memory module, key manager |
-| Prompt eval metrics | relevance ≥ 7, groundedness ≥ 6 on reference dialogue (integration test) |
+| Avg Relevance | 6.6 / 10 |
+| Avg Groundedness | 8.3 / 10 |
+| Avg Sales Effectiveness | 5.9 / 10 |
+| Avg Overall | 6.9 / 10 |
+| Avg turn latency | ~6.5 s (Groq free tier) |
+| API key resilience | Key rotation triggered during eval run (key 1 → key 2); zero user-visible errors |
 | Full sales funnel | qualification → RAG retrieval → tariff calculation → lead creation |
-| Avg turn latency | ~331 ms (Groq inference + ChromaDB retrieval, local CPU embeddings) |
-| API key resilience | 3 Groq keys with automatic rotation on 429, zero user-visible errors |
 
 ---
 

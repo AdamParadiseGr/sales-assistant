@@ -8,12 +8,15 @@ Usage:
 """
 from __future__ import annotations
 
+import sys
+if hasattr(sys.stdout, 'reconfigure'):
+    sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+
 import argparse
 import asyncio
 import json
 import logging
 import statistics
-import sys
 import time
 from pathlib import Path
 
@@ -207,7 +210,7 @@ async def main(reset_log: bool) -> None:
         all_results.append(results)
         for i, r in enumerate(results, 1):
             print(f"  Turn {i}: {r['user'][:70]}")
-            print(f"       → {r['agent'][:120]}  ({r['latency_ms']:.0f}ms)")
+            print(f"       -> {r['agent'][:120]}  ({r['latency_ms']:.0f}ms)")
 
     total_elapsed = time.perf_counter() - t_start
 
