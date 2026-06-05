@@ -1,203 +1,203 @@
-# AI Sales Assistant for SMB Banking
+# AI-ассистент для продажи банковских продуктов МСБ
 
-A production-grade conversational AI that helps bank managers sell SMB products (current accounts, acquiring, credit) via Telegram or REST API. The agent qualifies the client, retrieves grounded product information from a vector database, calculates tariffs on the fly, and creates CRM leads — all within a single multi-turn dialogue. Every response is automatically scored by an LLM judge to measure quality without human labelling.
-
----
-
-## Problem & Goal
-
-SMB sales calls follow a predictable qualification funnel: collect business type and monthly turnover, map them to the right tariff, handle objections with accurate numbers, and convert to a lead. Human managers are inconsistent; generic chatbots hallucinate pricing. This project shows how prompt engineering, RAG, and structured function calling can automate that funnel reliably — and how to *measure* reliability with an automated evaluation pipeline.
+Готовый к продакшену диалоговый AI, который помогает банковским менеджерам продавать продукты для малого и среднего бизнеса (расчётно-кассовое обслуживание, эквайринг, кредиты) через Telegram или REST API. Агент квалифицирует клиента, получает проверенную информацию о продуктах из векторной базы данных, рассчитывает тарифы на лету и создаёт лиды в CRM — всё в рамках единого многоходового диалога. Каждый ответ автоматически оценивается LLM-судьёй для измерения качества без ручной разметки.
 
 ---
 
-## Architecture
+## Проблема и цель
+
+Звонки по продажам МСБ следуют предсказуемой воронке квалификации: собрать тип бизнеса и ежемесячный оборот, подобрать подходящий тариф, отработать возражения с точными цифрами и конвертировать в лид. Живые менеджеры непоследовательны; обычные чат-боты галлюцинируют с ценами. Этот проект показывает, как промпт-инжиниринг, RAG и структурированный function calling могут автоматизировать эту воронку надёжно — и как *измерять* надёжность с помощью автоматического пайплайна оценки.
+
+---
+
+## Архитектура
 
 ```
-User (Telegram / REST)
+Пользователь (Telegram / REST)
         │
         ▼
   FastAPI  (main.py)
         │
         ▼
 LangGraph ReAct Agent  (agent.py)
-        ├── RAG Tool        ──► ChromaDB  (53 chunks, all-MiniLM-L6-v2)
-        ├── Tariff Tool     ──► tariffs.json  (rule-based calculator)
+        ├── RAG Tool        ──► ChromaDB  (53 чанка, all-MiniLM-L6-v2)
+        ├── Tariff Tool     ──► tariffs.json  (калькулятор на правилах)
         └── Lead Tool       ──► leads.db  (SQLite CRM)
         │
         ▼
-ConversationBufferMemory  (window = 10 turns, client profile in session state)
+ConversationBufferMemory  (окно = 10 ходов, профиль клиента в session state)
         │
         ▼
 LLM Judge  (evaluator.py)  ──► logs/evaluation_log.jsonl
 ```
 
-**Request flow:**
-1. User message arrives via Telegram webhook or `POST /chat`
-2. LangGraph agent prepends system prompt + session history, then runs a ReAct loop
-3. Agent calls tools as needed (RAG for facts, Tariff for pricing, Lead for conversion)
-4. Response is returned; an async background task scores it with the LLM judge
-5. Scores are appended to `evaluation_log.jsonl` for offline analysis
+**Поток запроса:**
+1. Сообщение пользователя поступает через Telegram webhook или `POST /chat`
+2. LangGraph агент добавляет системный промпт + историю сессии, затем запускает цикл ReAct
+3. Агент вызывает инструменты по мере необходимости (RAG для фактов, Tariff для цен, Lead для конверсии)
+4. Ответ возвращается; асинхронная фоновая задача оценивает его с помощью LLM-судьи
+5. Оценки добавляются в `evaluation_log.jsonl` для офлайн-анализа
 
 ---
 
-## Tech Stack
+## Стек технологий
 
-| Component | Technology | Version |
+| Компонент | Технология | Версия |
 |---|---|---|
-| API framework | FastAPI + Uvicorn | 0.115.5 / 0.32.1 |
-| Agent framework | LangGraph (ReAct) | ≥ 1.0.0 |
+| API фреймворк | FastAPI + Uvicorn | 0.115.5 / 0.32.1 |
+| Фреймворк агента | LangGraph (ReAct) | ≥ 1.0.0 |
 | LLM | Groq — `llama3-groq-70b-8192-tool-use-preview` | langchain-groq 1.1.2 |
-| Embeddings | `all-MiniLM-L6-v2` (local, CPU) | sentence-transformers 5.5.1 |
-| Vector DB | ChromaDB | 1.5.9 |
-| Validation | Pydantic v2 | 2.10.3 |
+| Эмбеддинги | `all-MiniLM-L6-v2` (локально, CPU) | sentence-transformers 5.5.1 |
+| Векторная БД | ChromaDB | 1.5.9 |
+| Валидация | Pydantic v2 | 2.10.3 |
 | Telegram | python-telegram-bot | 21.7 |
-| Testing | pytest + pytest-asyncio | 8.3.4 / 0.24.0 |
+| Тестирование | pytest + pytest-asyncio | 8.3.4 / 0.24.0 |
 | Python | CPython | 3.11+ |
 
 ---
 
-## Prompt Engineering
+## Промпт-инжиниринг
 
-### System Prompt (`app/prompts/system_prompt.md`)
+### Системный промпт (`app/prompts/system_prompt.md`)
 
-The agent plays **Alex**, a senior bank manager with 7 years of SMB experience. The prompt enforces a three-stage sales funnel:
+Агент играет роль **Алекса**, старшего банковского менеджера с 7-летним опытом работы с МСБ. Промпт задаёт трёхэтапную воронку продаж:
 
-1. **Qualification** — ask at most 2 questions per turn (business form, sector, monthly turnover, desired products). No lists, natural dialogue only.
-2. **Proposal** — only after business type and turnover are known. Every number must come from a tool call (`search_knowledge_base` or `calculate_tariff`). Hard rule: *no invented figures*.
-3. **Closing** — once the client signals readiness, collect name + phone and call `create_lead`.
+1. **Квалификация** — не более 2 вопросов за ход (форма бизнеса, сектор, ежемесячный оборот, желаемые продукты). Без списков, только естественный диалог.
+2. **Предложение** — только после того, как известны тип бизнеса и оборот. Каждая цифра должна исходить из вызова инструмента (`search_knowledge_base` или `calculate_tariff`). Жёсткое правило: *никаких выдуманных цифр*.
+3. **Закрытие** — как только клиент сигнализирует о готовности, собрать имя + телефон и вызвать `create_lead`.
 
-Key guardrails explicitly in the prompt:
-- "Never state rates, amounts, or deadlines without calling a tool first."
-- "Offer only products that exist in the knowledge base."
-- No banking jargon (the prompt maps terms: "annuity" → "equal monthly payments").
+Ключевые ограничения, явно прописанные в промпте:
+- «Никогда не указывать ставки, суммы или сроки без предварительного вызова инструмента.»
+- «Предлагать только продукты, существующие в базе знаний.»
+- Без банковского жаргона (промпт содержит маппинг терминов: «аннуитет» → «равные ежемесячные платежи»).
 
-### RAG Prompt (`app/prompts/rag_prompt.md`)
+### RAG-промпт (`app/prompts/rag_prompt.md`)
 
-Used by the RAG tool after retrieving the top-3 chunks (cosine similarity, 500-token chunks, 50-token overlap). The prompt instructs the synthesis LLM to:
-- Answer *strictly* from the provided context — no additions.
-- Quote exact numbers as they appear in the source.
-- If the context doesn't contain an answer, return a fixed phrase directing the user to a live manager — preventing silent hallucination.
-- Keep the response to 2–4 sentences with no meta-phrases like "Based on the context…".
+Используется RAG-инструментом после извлечения топ-3 чанков (косинусное сходство, чанки по 500 токенов, перекрытие 50 токенов). Промпт инструктирует синтезирующую LLM:
+- Отвечать *строго* на основе предоставленного контекста — без добавлений.
+- Цитировать точные числа так, как они указаны в источнике.
+- Если контекст не содержит ответа, вернуть фиксированную фразу, направляющую пользователя к живому менеджеру — предотвращая тихие галлюцинации.
+- Ограничить ответ 2–4 предложениями без мета-фраз вроде «На основе контекста…».
 
-### LLM Judge (`app/prompts/judge_prompt.md`)
+### LLM-судья (`app/prompts/judge_prompt.md`)
 
-Every agent response is scored asynchronously on three metrics (0–10 integer each):
+Каждый ответ агента асинхронно оценивается по трём метрикам (целое число от 0 до 10):
 
-| Metric | Measures |
+| Метрика | Что измеряет |
 |---|---|
-| `relevance` | Does the response address what was asked? |
-| `groundedness` | Are all stated facts traceable to real bank products? |
-| `sales_effectiveness` | Does the response move the dialogue toward a lead / account opening? |
+| `relevance` | Отвечает ли ответ на заданный вопрос? |
+| `groundedness` | Прослеживаются ли все утверждённые факты до реальных банковских продуктов? |
+| `sales_effectiveness` | Продвигает ли ответ диалог к созданию лида / открытию счёта? |
 
-The judge also produces a `reasoning` field (2–3 sentences), making failures debuggable without manual inspection. Scores are written to `evaluation_log.jsonl` with timestamp and session ID, enabling offline aggregation (e.g., average scores per prompt version, per product category).
+Судья также формирует поле `reasoning` (2–3 предложения), делая сбои отлаживаемыми без ручной проверки. Оценки записываются в `evaluation_log.jsonl` с меткой времени и идентификатором сессии, что позволяет офлайн-агрегацию (например, средние оценки по версии промпта, по категории продукта).
 
-The judge uses `with_structured_output(EvaluationResult)` — Pydantic enforces score bounds [0, 10] at the framework level, so malformed judge responses raise a `ValidationError` rather than silently polluting the log.
-
----
-
-## Key Design Decisions
-
-### LangGraph instead of AgentExecutor
-
-`AgentExecutor` (LangChain classic) accumulates tool outputs in a single growing string, which causes context overflow on long conversations and makes tool-call debugging opaque. LangGraph represents the agent loop as an explicit state machine with typed `messages` — each node is observable, the graph can be interrupted and resumed, and the message history stays structured. This also makes it straightforward to inject session history as typed `HumanMessage`/`AIMessage` objects without mixing formats.
-
-### Prompt versioning in `.md` files
-
-All prompts live in `app/prompts/*.md` and are loaded at runtime via `_load_prompt(name)`. This means:
-- Prompt changes are tracked by git diff like any source file.
-- A/B testing different prompt versions requires no code changes — swap the file, restart, re-run evals.
-- The LLM judge evaluates the *deployed* prompt, not a hardcoded string buried in Python.
-
-### API key rotation on rate limit
-
-Groq free-tier keys have per-minute token limits. `GroqKeyManager` (`app/key_manager.py`) holds a pool of keys (`GROQ_API_KEY_1/2/3`) and cycles through them when it detects a 429 response. Both the main agent and the LLM judge share the same key manager. On rotation, the agent rebuilds its LangGraph and tools with the new key (the embedding model and ChromaDB vectorstore are reused — they load once at startup). If all keys are exhausted, the user receives a user-friendly retry message instead of a stack trace.
+Судья использует `with_structured_output(EvaluationResult)` — Pydantic применяет ограничения оценок [0, 10] на уровне фреймворка, поэтому некорректные ответы судьи вызывают `ValidationError`, а не тихо засоряют лог.
 
 ---
 
-## Results
+## Ключевые архитектурные решения
 
-| Metric | Value |
+### LangGraph вместо AgentExecutor
+
+`AgentExecutor` (классический LangChain) накапливает результаты инструментов в единую растущую строку, что вызывает переполнение контекста при длинных разговорах и делает отладку вызовов инструментов непрозрачной. LangGraph представляет цикл агента как явную машину состояний с типизированными `messages` — каждый узел наблюдаем, граф можно прерывать и возобновлять, а история сообщений остаётся структурированной. Это также упрощает внедрение истории сессии в виде типизированных объектов `HumanMessage`/`AIMessage` без смешивания форматов.
+
+### Версионирование промптов в `.md`-файлах
+
+Все промпты хранятся в `app/prompts/*.md` и загружаются во время выполнения через `_load_prompt(name)`. Это означает:
+- Изменения промптов отслеживаются через git diff как любой исходный файл.
+- A/B-тестирование разных версий промптов не требует изменений кода — поменяй файл, перезапусти, запусти эвалы снова.
+- LLM-судья оценивает *развёрнутый* промпт, а не захардкоженную строку в Python.
+
+### Ротация API-ключей при превышении лимита
+
+Ключи бесплатного уровня Groq имеют лимиты токенов в минуту. `GroqKeyManager` (`app/key_manager.py`) хранит пул ключей (`GROQ_API_KEY_1/2/3`) и переключается между ними при обнаружении ответа 429. Основной агент и LLM-судья используют один и тот же менеджер ключей. При ротации агент пересобирает свой LangGraph и инструменты с новым ключом (модель эмбеддингов и ChromaDB векторстор переиспользуются — они загружаются один раз при запуске). Если все ключи исчерпаны, пользователь получает понятное сообщение с просьбой повторить попытку вместо стектрейса.
+
+---
+
+## Результаты
+
+| Метрика | Значение |
 |---|---|
-| Unit tests | 109 passing, 2 skipped (integration, require live API key) |
-| Test coverage | RAG tool, tariff calculator, lead tool, evaluator, memory module, key manager |
-| Avg Relevance | 6.6 / 10 |
-| Avg Groundedness | 8.3 / 10 |
-| Avg Sales Effectiveness | 5.9 / 10 |
-| Avg Overall | 6.9 / 10 |
-| Avg turn latency | ~6.5 s (Groq free tier) |
-| API key resilience | Key rotation triggered during eval run (key 1 → key 2); zero user-visible errors |
-| Full sales funnel | qualification → RAG retrieval → tariff calculation → lead creation |
+| Юнит-тесты | 109 успешных, 2 пропущено (интеграционные, требуют живой API-ключ) |
+| Покрытие тестами | RAG-инструмент, калькулятор тарифов, инструмент лидов, эвалюатор, модуль памяти, менеджер ключей |
+| Средний Relevance | 6.6 / 10 |
+| Средний Groundedness | 8.3 / 10 |
+| Средний Sales Effectiveness | 5.9 / 10 |
+| Средний Overall | 6.9 / 10 |
+| Средняя латентность хода | ~6.5 с (Groq бесплатный уровень) |
+| Устойчивость к смене ключей | Ротация ключей сработала во время запуска эвалов (ключ 1 → ключ 2); ноль ошибок, видимых пользователю |
+| Полная воронка продаж | квалификация → RAG-поиск → расчёт тарифа → создание лида |
 
 ---
 
-## Quick Start
+## Быстрый старт
 
 ```bash
-# 1. Clone and install
+# 1. Клонировать и установить зависимости
 git clone <repo-url>
 cd sales-assistant
 pip install -r requirements.txt
 
-# 2. Configure environment
+# 2. Настроить окружение
 cp .env.example .env
-# Edit .env — add at least one Groq key (GROQ_API_KEY_1)
-# Optionally add TELEGRAM_BOT_TOKEN for Telegram mode
+# Отредактировать .env — добавить хотя бы один ключ Groq (GROQ_API_KEY_1)
+# Опционально добавить TELEGRAM_BOT_TOKEN для режима Telegram
 
-# 3. Ingest knowledge base into ChromaDB (one-time)
+# 3. Загрузить базу знаний в ChromaDB (один раз)
 python scripts/ingest.py
 
-# 4. Run the API
+# 4. Запустить API
 uvicorn app.main:app --reload
 
-# 5. Chat via REST
+# 5. Общаться через REST
 curl -X POST http://localhost:8000/chat \
   -H "Content-Type: application/json" \
   -d '{"session_id": "demo", "message": "Хочу открыть счёт для ИП"}'
 
-# 6. Run tests
+# 6. Запустить тесты
 pytest tests/ -v
 
-# 7. Run prompt evaluations (requires GROQ_API_KEY)
+# 7. Запустить оценку промптов (требуется GROQ_API_KEY)
 python scripts/run_evals.py
 ```
 
 ---
 
-## Project Structure
+## Структура проекта
 
 ```
 sales-assistant/
 ├── app/
-│   ├── agent.py          # LangGraph ReAct agent; key rotation retry loop
-│   ├── evaluator.py      # LLM judge; async scoring; JSONL logging
+│   ├── agent.py          # LangGraph ReAct агент; цикл повтора при ротации ключей
+│   ├── evaluator.py      # LLM-судья; асинхронная оценка; логирование в JSONL
 │   ├── key_manager.py    # GroqKeyManager; AllKeysExhaustedError; _is_rate_limit
-│   ├── main.py           # FastAPI app; Telegram webhook handler
+│   ├── main.py           # FastAPI приложение; обработчик Telegram webhook
 │   ├── memory.py         # SessionMemory; ClientProfile; MemoryManager
 │   ├── data/
-│   │   ├── tariffs.json          # Structured tariff rules (RKO, acquiring, credit)
-│   │   └── knowledge_base/       # Source documents for RAG
+│   │   ├── tariffs.json          # Структурированные тарифные правила (РКО, эквайринг, кредит)
+│   │   └── knowledge_base/       # Исходные документы для RAG
 │   │       ├── rko.md
 │   │       ├── acquiring.md
 │   │       └── credit.md
 │   ├── prompts/
-│   │   ├── system_prompt.md      # Agent persona, dialogue strategy, guardrails
-│   │   ├── rag_prompt.md         # RAG synthesis; anti-hallucination rules
-│   │   └── judge_prompt.md       # Evaluation rubric; per-metric score anchors
+│   │   ├── system_prompt.md      # Персона агента, стратегия диалога, ограничения
+│   │   ├── rag_prompt.md         # Синтез RAG; правила против галлюцинаций
+│   │   └── judge_prompt.md       # Рубрика оценки; якоря оценок по метрикам
 │   └── tools/
-│       ├── rag_tool.py           # ChromaDB retrieval + synthesis via rag_prompt
-│       ├── tariff_tool.py        # Rule-based tariff calculator from tariffs.json
-│       └── lead_tool.py          # SQLite CRM; UUID lead IDs
+│       ├── rag_tool.py           # ChromaDB поиск + синтез через rag_prompt
+│       ├── tariff_tool.py        # Калькулятор тарифов на правилах из tariffs.json
+│       └── lead_tool.py          # SQLite CRM; UUID идентификаторы лидов
 ├── scripts/
-│   ├── ingest.py         # Chunk knowledge_base/*.md → ChromaDB (run once)
-│   └── run_evals.py      # Batch prompt evaluation; prints aggregate scores
+│   ├── ingest.py         # Разбить knowledge_base/*.md на чанки → ChromaDB (один раз)
+│   └── run_evals.py      # Пакетная оценка промптов; вывод агрегированных оценок
 ├── tests/
-│   ├── test_key_manager.py   # GroqKeyManager unit tests; rate-limit retry mocks
-│   ├── test_tools.py         # Tariff calculator (boundary tests); lead tool (SQLite)
-│   ├── test_prompts.py       # Evaluator unit tests; memory module; prompt file checks
-│   └── test_rag.py           # RAG tool unit tests
+│   ├── test_key_manager.py   # Юнит-тесты GroqKeyManager; моки повтора при rate-limit
+│   ├── test_tools.py         # Калькулятор тарифов (граничные тесты); инструмент лидов (SQLite)
+│   ├── test_prompts.py       # Юнит-тесты эвалюатора; модуль памяти; проверки файлов промптов
+│   └── test_rag.py           # Юнит-тесты RAG-инструмента
 ├── logs/
-│   └── evaluation_log.jsonl  # Append-only; one JSON object per agent turn
-├── .env.example          # All required env vars with descriptions
+│   └── evaluation_log.jsonl  # Только добавление; один JSON-объект на ход агента
+├── .env.example          # Все необходимые переменные окружения с описаниями
 ├── requirements.txt
 └── pytest.ini
 ```
