@@ -12,23 +12,52 @@
 
 ## Архитектура
 
-```
-Пользователь (Telegram / REST)
-        │
-        ▼
-  FastAPI  (main.py)
-        │
-        ▼
-LangGraph ReAct Agent  (agent.py)
-        ├── RAG Tool        ──► ChromaDB  (база знаний по продуктам)
-        ├── Tariff Tool     ──► tariffs.json  (калькулятор тарифов)
-        └── Lead Tool       ──► leads.db  (SQLite CRM)
-        │
-        ▼
-ConversationBufferMemory  (окно = 10 сообщений, профиль клиента в session state)
-        │
-        ▼
-LLM Judge  (evaluator.py)  ──► logs/evaluation_log.jsonl
+```mermaid
+flowchart TD
+    U([👤 Пользователь]) -->|Telegram / REST POST /chat| API
+
+    subgraph API ["🌐 FastAPI  (main.py)"]
+        direction TB
+        WH[Telegram Webhook] 
+        CH[POST /chat]
+    end
+
+    API --> Agent
+
+    subgraph Agent ["🤖 LangGraph ReAct Agent  (agent.py)"]
+        direction TB
+        SP[System Prompt] --> Loop[ReAct Loop]
+        MEM[ConversationBufferMemory\nwindow=10 + ClientProfile] --> Loop
+        Loop -->|tool call| TOOLS
+    end
+
+    subgraph TOOLS ["🔧 Tools"]
+        direction TB
+        RAG[RAG Tool\nrag_tool.py]
+        TAR[Tariff Tool\ntariff_tool.py]
+        LEAD[Lead Tool\nlead_tool.py]
+    end
+
+    RAG -->|similarity search| VDB[(ChromaDB\nbase знаний)]
+    TAR -->|rule lookup| TJ[(tariffs.json)]
+    LEAD -->|INSERT| DB[(leads.db\nSQLite CRM)]
+
+    Loop -->|ответ| API
+    API -->|ответ| U
+
+    Loop -.->|async| JUDGE
+
+    subgraph JUDGE ["⚖️ LLM Judge  (evaluator.py)"]
+        direction TB
+        JP[judge_prompt.md] --> SC[EvaluationResult\nrelevance · groundedness\nsales_effectiveness]
+    end
+
+    SC -.->|append| LOG[(evaluation_log.jsonl)]
+
+    style Agent fill:#e8f4f8,stroke:#2196F3
+    style TOOLS fill:#fff8e1,stroke:#FF9800
+    style JUDGE fill:#f3e5f5,stroke:#9C27B0
+    style API fill:#e8f5e9,stroke:#4CAF50
 ```
 
 **Поток запроса:**
